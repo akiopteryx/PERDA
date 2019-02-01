@@ -1,0 +1,143 @@
+mxram 1000;
+macro *5 1000030;
+macro[((8*(10*ntax*nchar*1000030)/1000)+2500);
+macro =;
+/***  PERDA v1.1  ***/
+/*** AKI WATANABE ***/
+/*** AMERICAN MUSEUM OF NATURAL HISTORY ***/
+/*** FEB 06 2014 ***/
+
+quote
+----------------------------------      
+          * PERDA v1.1 *     
+
+Aki Watanabe  <awatanabe@amnh.org>
+American Museum of Natural History
+----------------------------------;
+
+if (argnumber < 2) quote ERROR!
+   Too few arguments! Please rerun with matrix filename, number of iterations.
+   e.g. >perda matrix.tnt 10000;
+   proc/;
+   end;
+
+if (argnumber > 2) quote ERROR!
+   Too many arguments! Please rerun with matrix filename, number of iterations.
+   e.g. >perda matrix.tnt 10000;
+   proc/;
+   end;
+
+if (%2 > 1000000) quote ERROR!
+   Maximum allowed iterations is 1,000,000.
+   You may modify Ln 1-3 of the script to allow more iterations.
+   proc/;
+   end;
+
+sil =console;
+
+rseed 0;
+
+proc %1;
+hold 10000;
+taxname =;
+collapse rule 1; /*** modify accordingly ***/
+mult: replic 1000 hold 10; /*** modify appropriately ***/
+mult;
+bbreak;
+nelsen *;
+tsave* perda.tnttre;
+save /;
+keep 0;
+
+/*** VARIABLES ***/
+var: newseed state nums numelements numpoly proppoly pick tmp[22] chosen;
+set numelements ntax*nchar;
+set numpoly 0;
+set nums %2+1;
+var: rf['nums'];
+
+/*** ANALYSIS ***/
+
+loop 0 ntax
+   loop 0 nchar
+   set state states[#2 #1];
+   if ('state' != missing);
+      set nums = numbits['state'];
+      set numpoly += ('nums' != 1);
+      end
+    stop
+stop
+set proppoly 'numpoly'/'numelements';
+
+loop 1 %2
+   proc %1;
+   loop 0 ntax
+      loop 0 nchar
+      set state states[#3 #2];
+      /*** quote bitset= $bitset 'state'; ***/
+      if ('state' != missing);
+         set nums = numbits['state'];
+         /*** quote nums='nums'; ***/
+         if ('nums' != 1) 
+            /*** quote MULTISTATE; ***/
+            set pick = getrandom [ 1 'nums' ];
+            /*** quote pick= 'pick' of 'nums'; ***/
+            set tmp $ $bitset:'pick' 'state';
+            set chosen ( $tmp:-1 );
+            /*** quote chosen= 'chosen'; ***/
+            xread =#3 #2 'chosen';
+         end
+      end
+      stop
+   stop
+   /*** xread *; ***/
+   mult;
+   bbreak;
+   nelsen *;
+   save /;
+   keep 0;
+stop
+tsave /;
+keep 0;
+
+sil =console;
+proc perda.tnttre;
+nelsen *1.%2;
+tsave *perda_consensus.tnttre;
+save /;
+tsave /;
+keep 0;
+
+proc perda.tnttre;
+set 0 collapse ;  /*** remember value of cllpse in variable 0 ***/
+collapse none ;
+loop 1 %2
+	tcomp * ]0 #1; /*** This is based on R-F script written by P. Goloboff ***/
+    tcomp * ]#1 0;
+    set 1 ((tnodes[ntrees]+tnodes[(ntrees-1)])/(tnodes[0]+tnodes[#1]));
+    collapse '0';
+    set nums ntrees - 1 ;
+    keep 'nums';
+    set rf[#1] '/.3(1)';
+    stop
+
+sil -all;
+log perda_rfdist.txt;
+loop 1 %2
+    quote 'rf[(#1)]';
+    stop
+log/;
+quote 
+----------------------------------
+         * ANALYSIS DONE *
+
+Proportion of polymorphic codings: 'proppoly'
+
+Output files: 
+1. perda.tnttre (first tree: consensus from original matrix)
+2. perda_consensus.tnttre (consensus of trees from simulations)
+3. perda_rfdist.txt (list of R-F distances)
+----------------------------------;
+
+proc/;
+macro-;
